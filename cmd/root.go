@@ -46,7 +46,6 @@ var rootCmd = &cobra.Command{
 	Run: func(cmd *cobra.Command, args []string) {
 
 		os.Mkdir(config.Config.TmpPath, 0755)
-		removeBuildErrorsLog()
 
 		server := server.NewSocketServer(config.Config.SocketPath, serverHandler)
 		log.Println("Starting socket server")
@@ -55,7 +54,7 @@ var rootCmd = &cobra.Command{
 		watch = watcher.NewWatcher(config.Config.Root, config.Config.TmpPath, config.Config.IgnoredDirectories, config.Config.ValidExtensions)
 		watch.Start()
 
-		builder = worker.NewBuilder(config.Config.Root, config.Config.BuildPath())
+		builder = worker.NewBuilder(config.Config.Root, config.Config.BuildPath(), config.Config.BuildLog)
 		runner = worker.NewRunner(config.Config.BuildPath())
 
 		loopIndex := 0
@@ -77,15 +76,15 @@ var rootCmd = &cobra.Command{
 				flushEvents(watch)
 
 				fmt.Printf("Started! (%d Goroutines)\n", runtime.NumGoroutine())
-				removeBuildErrorsLog()
 
 				// extract filename from event
 				fileName := strings.Replace(strings.Split(eventName, ":")[0], `"`, "", -1)
 				if config.Config.HasFileValidExtension(fileName) {
 					if err := builder.Build(); err != nil {
 						buildFailed = true
-						fmt.Printf("Build Failed: \n %s\n", err.Error())
-						createBuildErrorsLog(err.Error())
+						fmt.Println(err.Error())
+					} else {
+						buildFailed = false
 					}
 				}
 
@@ -210,25 +209,5 @@ func flushEvents(w *watcher.Watcher) {
 		default:
 			return
 		}
-	}
-}
-
-func createBuildErrorsLog(message string) bool {
-	file, err := os.Create(config.Config.BuildLogPath())
-	if err != nil {
-		return false
-	}
-
-	_, err = file.WriteString(message)
-	if err != nil {
-		return false
-	}
-
-	return true
-}
-
-func removeBuildErrorsLog() {
-	if _, err := os.Stat(config.Config.BuildLogPath()); os.IsExist(err) {
-		os.Remove(config.Config.BuildLogPath())
 	}
 }

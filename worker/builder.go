@@ -10,14 +10,16 @@ import (
 )
 
 type Builder struct {
-	rootPath   string
-	outputPath string
+	rootPath     string
+	outputPath   string
+	errorLogPath string
 }
 
-func NewBuilder(rootPath string, outputPath string) *Builder {
+func NewBuilder(rootPath string, outputPath string, errorLogPath string) *Builder {
 	return &Builder{
 		rootPath:   rootPath,
 		outputPath: outputPath,
+		errorLogPath: errorLogPath,
 	}
 }
 
@@ -46,9 +48,31 @@ func (b *Builder) Build() error {
 
 	err = cmd.Wait()
 	if err != nil {
-		return errors.New(string(errBuf))
+		b.createBuildErrorsLog(string(errBuf))
+		return errors.New("build failed")
 	}
 	log.Println("Build finished")
 
 	return nil
 }
+
+func (b *Builder) createBuildErrorsLog(message string) {
+	file, err := os.Create(b.errorLogPath)
+	if err != nil {
+		return
+	}
+
+	_, err = file.WriteString(message)
+	if err != nil {
+		return
+	}
+
+	return
+}
+
+func (b *Builder) removeBuildErrorsLog() {
+	if _, err := os.Stat(b.errorLogPath); os.IsExist(err) {
+		os.Remove(b.errorLogPath)
+	}
+}
+
