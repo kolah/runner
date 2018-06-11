@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"bufio"
 	"os"
+	"github.com/kolah/runner/worker"
 )
 
 var controlCmd = &cobra.Command{
@@ -32,11 +33,11 @@ var controlCmd = &cobra.Command{
 		switch mode {
 		case "debug":
 			fmt.Fprintln(cmd.OutOrStdout(), "Switching runner to debug mode")
-			msg = fmt.Sprintf("%s %s", ClientSetMode, RunnerModeDebug)
+			msg = fmt.Sprintf("%s %s", ClientSetMode, worker.RunnerModeDebug)
 			break
 		case "rebuild":
 			fmt.Fprintln(cmd.OutOrStdout(), "Switching runner to live rebuild mode")
-			msg = fmt.Sprintf("%s %s", ClientSetMode, RunnerModeLiveRebuild)
+			msg = fmt.Sprintf("%s %s", ClientSetMode, worker.RunnerModeLiveRebuild)
 		case "stop":
 			fmt.Fprintln(cmd.OutOrStdout(), "Stopping runner")
 			msg = fmt.Sprintf("%s", ClientStop)

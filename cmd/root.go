@@ -19,14 +19,8 @@ import (
 	"github.com/kolah/runner/worker"
 )
 
-type RunnerMode string
 type ServerResponse string
 type ClientCommand string
-
-const (
-	RunnerModeLiveRebuild RunnerMode = "LIVEREBUILD"
-	RunnerModeDebug       RunnerMode = "DEBUG"
-)
 
 const (
 	ServerOK  ServerResponse = "OK"
@@ -39,9 +33,10 @@ const (
 )
 
 var (
-	currentMode = RunnerModeLiveRebuild
-	runner      *worker.Worker
+	currentMode = worker.RunnerModeLiveRebuild
+	runner      *worker.Runner
 	builder     *worker.Builder
+	watch       *watcher.Watcher
 )
 
 var rootCmd = &cobra.Command{
@@ -57,10 +52,11 @@ var rootCmd = &cobra.Command{
 		log.Println("Starting socket server")
 		server.Start()
 
-		w := watcher.NewWatcher(config.Config.Root, config.Config.TmpPath, config.Config.IgnoredDirectories, config.Config.ValidExtensions)
-		w.Start()
+		watch = watcher.NewWatcher(config.Config.Root, config.Config.TmpPath, config.Config.IgnoredDirectories, config.Config.ValidExtensions)
+		watch.Start()
 
 		builder = worker.NewBuilder(config.Config.Root, config.Config.BuildPath())
+		runner = worker.NewRunner(config.Config.BuildPath())
 
 		loopIndex := 0
 		buildFailed := false
@@ -70,18 +66,17 @@ var rootCmd = &cobra.Command{
 				loopIndex++
 
 				fmt.Printf("Waiting (loop %d)...\n", loopIndex)
-				eventName := <-w.EventChannel
+				eventName := <-watch.EventChannel
 
 				fmt.Printf("receiving first event %s\n", eventName)
-				fmt.Printf("sleeping for %d milliseconds\n", config.Config.BuildDelay)
 
+				fmt.Printf("sleeping for %d milliseconds\n", config.Config.BuildDelay)
 				time.Sleep(time.Duration(config.Config.BuildDelay) * time.Millisecond)
 
 				fmt.Println("flushing events")
+				flushEvents(watch)
 
-				flushEvents(w)
-
-				fmt.Printf("Started! (%d Goroutines)", runtime.NumGoroutine())
+				fmt.Printf("Started! (%d Goroutines)\n", runtime.NumGoroutine())
 				removeBuildErrorsLog()
 
 				// extract filename from event
@@ -94,29 +89,8 @@ var rootCmd = &cobra.Command{
 					}
 				}
 
-				if runner != nil {
-					runner.Stop()
-				}
-
 				if !buildFailed {
-					switch currentMode {
-					case RunnerModeLiveRebuild:
-						runner = worker.NewWorker(config.Config.BuildPath())
-						runner.Run()
-						break
-					case RunnerModeDebug:
-						runner = worker.NewWorker("dlv", "--headless", "--listen=:2345", "--api-version=2", "exec", config.Config.BuildPath())
-						runner.Run()
-
-						go func() {
-							<-runner.FinishedChannel
-							// return to live rebuild
-							currentMode = RunnerModeLiveRebuild
-							w.EventChannel <- "/"
-						}()
-
-						break
-					}
+					runner.Start(currentMode)
 				} else if config.Config.WebWrapperEnabled {
 					// start web server to show the error
 				}
@@ -125,7 +99,8 @@ var rootCmd = &cobra.Command{
 			}
 		}()
 
-		w.EventChannel <- "/"
+		// trigger build
+		watch.EventChannel <- "/"
 
 		sigc := make(chan os.Signal, 1)
 		signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
@@ -178,11 +153,16 @@ func serverHandler(c net.Conn) {
 				c.Close()
 				return
 			}
-			mode := RunnerMode(parts[1])
-			if mode == RunnerModeDebug || mode == RunnerModeLiveRebuild {
+			mode := worker.RunnerMode(parts[1])
+			if mode == worker.RunnerModeDebug || mode == worker.RunnerModeLiveRebuild {
 				currentMode = mode
+				if err := builder.Build(); err != nil {
+					fmt.Fprintln(c, ServerErr, "Build error")
+					c.Close()
+					return
+				}
+				runner.Start(mode)
 				fmt.Fprintln(c, ServerOK, "Switched mode to", mode)
-				fmt.Println("Switched mode to", mode)
 				c.Close()
 				return
 			} else {

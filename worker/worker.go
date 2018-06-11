@@ -2,9 +2,9 @@ package worker
 
 import (
 	"os/exec"
-	"log"
 	"io"
 	"os"
+	"fmt"
 )
 
 type Worker struct {
@@ -28,42 +28,43 @@ func (w *Worker) Run() {
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println("Error", err)
+		os.Exit(1)
 	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println("Error", err)
+		os.Exit(1)
 	}
 
 	err = cmd.Start()
 	if err != nil {
-		log.Fatal(err)
+		fmt.Println("Error", err)
+		os.Exit(1)
 	}
 
 	go io.Copy(os.Stderr, stderr)
 	go io.Copy(os.Stdout, stdout)
 
 	go func() {
-		cmd.Wait()
+		if err := cmd.Wait(); err != nil {
+			fmt.Println()
+		}
 		w.FinishedChannel <- true
 	}()
 
 	go func() {
 		<-w.stopChannel
 
-		alreadyExited := cmd.ProcessState.Exited()
 		pid := cmd.Process.Pid
-
-		if !alreadyExited {
-			log.Println("Killing PID", pid)
-			cmd.Process.Kill()
-		} else {
-			log.Println("Process already exited", pid)
-		}
+		fmt.Println("Killing PID", pid)
+		cmd.Process.Kill()
+		w.stopChannel <- true
 	}()
 }
 
 func (w *Worker) Stop() {
 	w.stopChannel <- true
+	<-w.stopChannel
 }
