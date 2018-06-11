@@ -3,7 +3,6 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 	"net"
-	"log"
 	"github.com/kolah/runner/config"
 	"fmt"
 	"bufio"
@@ -16,7 +15,8 @@ var controlCmd = &cobra.Command{
 
 	Run: func(cmd *cobra.Command, args []string) {
 		if len(args) != 1 {
-			log.Fatal("Invalid number of arguments")
+			fmt.Fprintln(cmd.OutOrStderr(), "Invalid number of arguments")
+			os.Exit(1)
 		}
 
 		c, err := net.Dial("unix", config.Config.SocketPath)

@@ -40,8 +40,8 @@ const (
 
 var (
 	currentMode = RunnerModeLiveRebuild
-	runner *worker.Worker
-	builder *worker.Builder
+	runner      *worker.Worker
+	builder     *worker.Builder
 )
 
 var rootCmd = &cobra.Command{
@@ -84,6 +84,7 @@ var rootCmd = &cobra.Command{
 				fmt.Printf("Started! (%d Goroutines)", runtime.NumGoroutine())
 				removeBuildErrorsLog()
 
+				// extract filename from event
 				fileName := strings.Replace(strings.Split(eventName, ":")[0], `"`, "", -1)
 				if config.Config.HasFileValidExtension(fileName) {
 					if err := builder.Build(); err != nil {
@@ -106,8 +107,18 @@ var rootCmd = &cobra.Command{
 					case RunnerModeDebug:
 						runner = worker.NewWorker("dlv", "--headless", "--listen=:2345", "--api-version=2", "exec", config.Config.BuildPath())
 						runner.Run()
+
+						go func() {
+							<-runner.FinishedChannel
+							// return to live rebuild
+							currentMode = RunnerModeLiveRebuild
+							w.EventChannel <- "/"
+						}()
+
 						break
 					}
+				} else if config.Config.WebWrapperEnabled {
+					// start web server to show the error
 				}
 
 				fmt.Printf(strings.Repeat("-", 20))
@@ -221,7 +232,6 @@ func flushEvents(w *watcher.Watcher) {
 		}
 	}
 }
-
 
 func createBuildErrorsLog(message string) bool {
 	file, err := os.Create(config.Config.BuildLogPath())

@@ -8,16 +8,18 @@ import (
 )
 
 type Worker struct {
-	command     string
-	arguments   []string
-	stopChannel chan bool
+	command         string
+	arguments       []string
+	stopChannel     chan bool
+	FinishedChannel chan bool
 }
 
 func NewWorker(command string, arguments ...string) *Worker {
 	return &Worker{
-		command: command,
-		arguments: arguments,
-		stopChannel: make(chan bool, 1),
+		command:         command,
+		arguments:       arguments,
+		stopChannel:     make(chan bool, 1),
+		FinishedChannel: make(chan bool, 1),
 	}
 }
 
@@ -43,10 +45,22 @@ func (w *Worker) Run() {
 	go io.Copy(os.Stdout, stdout)
 
 	go func() {
+		cmd.Wait()
+		w.FinishedChannel <- true
+	}()
+
+	go func() {
 		<-w.stopChannel
+
+		alreadyExited := cmd.ProcessState.Exited()
 		pid := cmd.Process.Pid
-		log.Println("Killing PID", pid)
-		cmd.Process.Kill()
+
+		if !alreadyExited {
+			log.Println("Killing PID", pid)
+			cmd.Process.Kill()
+		} else {
+			log.Println("Process already exited", pid)
+		}
 	}()
 }
 
