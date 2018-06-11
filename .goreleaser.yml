@@ -1,0 +1,8 @@
+builds:
+  - binary: runner
+    goos:
+      - windows
+      - darwin
+      - linux
+    goarch:
+      - amd64
