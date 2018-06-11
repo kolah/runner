@@ -38,11 +38,11 @@ func (c configuration) HasFileValidExtension(fileName string) bool {
 	for _, e := range c.ValidExtensions {
 		e = strings.TrimSpace(e)
 		if strings.HasSuffix(fileName, e) {
-			return false
+			return true
 		}
 	}
 
-	return true
+	return false
 }
 
 

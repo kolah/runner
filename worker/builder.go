@@ -24,6 +24,8 @@ func NewBuilder(rootPath string, outputPath string, errorLogPath string) *Builde
 }
 
 func (b *Builder) Build() error {
+	b.removeBuildErrorsLog()
+
 	log.Println("Building...")
 
 	cmd := exec.Command("go", "build", "-gcflags=-N", "-gcflags=-l", "-o", b.outputPath, b.rootPath)

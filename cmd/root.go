@@ -54,11 +54,12 @@ var rootCmd = &cobra.Command{
 		watch = watcher.NewWatcher(config.Config.Root, config.Config.TmpPath, config.Config.IgnoredDirectories, config.Config.ValidExtensions)
 		watch.Start()
 
-		builder = worker.NewBuilder(config.Config.Root, config.Config.BuildPath(), config.Config.BuildLog)
+		builder = worker.NewBuilder(config.Config.Root, config.Config.BuildPath(), config.Config.BuildLogPath())
 		runner = worker.NewRunner(config.Config.BuildPath())
 
 		loopIndex := 0
 		buildFailed := false
+		alreadyBuilt := false
 
 		go func() {
 			for {
@@ -79,12 +80,13 @@ var rootCmd = &cobra.Command{
 
 				// extract filename from event
 				fileName := strings.Replace(strings.Split(eventName, ":")[0], `"`, "", -1)
-				if config.Config.HasFileValidExtension(fileName) {
+				if config.Config.HasFileValidExtension(fileName) || !alreadyBuilt {
 					if err := builder.Build(); err != nil {
 						buildFailed = true
 						fmt.Println(err.Error())
 					} else {
 						buildFailed = false
+						alreadyBuilt = true
 					}
 				}
 
