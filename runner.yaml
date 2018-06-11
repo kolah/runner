@@ -1,0 +1,2 @@
+ignored_directories: [ vendor ]
+web_wrapper_enabled: true
