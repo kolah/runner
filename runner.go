@@ -1,7 +1,7 @@
 package main
 
 import (
-	"runner/cmd"
+	"github.com/kolah/runner/cmd"
 )
 
 func main() {

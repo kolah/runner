@@ -4,7 +4,7 @@ import (
 	"github.com/spf13/cobra"
 	"net"
 	"log"
-	"runner/config"
+	"github.com/kolah/runner/config"
 	"fmt"
 	"bufio"
 	"os"

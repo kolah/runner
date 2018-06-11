@@ -3,12 +3,12 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 	"log"
-	"runner/config"
+	"github.com/kolah/runner/config"
 	"github.com/spf13/viper"
 	"fmt"
-	"runner/watcher"
+	"github.com/kolah/runner/watcher"
 	"os"
-	"runner/server"
+	"github.com/kolah/runner/server"
 	"net"
 	"bufio"
 	"os/signal"
@@ -16,7 +16,7 @@ import (
 	"strings"
 	"runtime"
 	"time"
-	"runner/worker"
+	"github.com/kolah/runner/worker"
 )
 
 type RunnerMode string
