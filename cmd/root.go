@@ -69,12 +69,6 @@ var rootCmd = &cobra.Command{
 			for {
 				loopIndex++
 
-				if err := builder.Build(); err != nil {
-					buildFailed = true
-					fmt.Printf("Build Failed: \n %s", err.Error())
-					createBuildErrorsLog(err.Error())
-				}
-
 				fmt.Printf("Waiting (loop %d)...\n", loopIndex)
 				eventName := <-w.EventChannel
 
@@ -119,6 +113,8 @@ var rootCmd = &cobra.Command{
 				fmt.Printf(strings.Repeat("-", 20))
 			}
 		}()
+
+		w.EventChannel <- "/"
 
 		sigc := make(chan os.Signal, 1)
 		signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
