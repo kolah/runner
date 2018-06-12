@@ -28,7 +28,7 @@ func (b *Builder) Build() error {
 
 	log.Println("Building...")
 
-	cmd := exec.Command("go", "build", "-gcflags=-N", "-gcflags=-l", "-o", b.outputPath, b.rootPath)
+	cmd := exec.Command("go", "build", "-gcflags", "all=-N -l", "-o", b.outputPath, b.rootPath)
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
