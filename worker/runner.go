@@ -1,6 +1,9 @@
 package worker
 
-import "fmt"
+import (
+	"sync"
+	"fmt"
+)
 
 type RunnerMode string
 
@@ -10,6 +13,7 @@ const (
 )
 
 type Runner struct {
+	sync.Mutex
 	worker *Worker
 	mode RunnerMode
 	executablePath string
@@ -22,11 +26,15 @@ func NewRunner(executablePath string) *Runner {
 	}
 }
 
-func (r *Runner) Start(mode RunnerMode) {
-	fmt.Println("Switched mode to", mode)
+func (r *Runner) SetMode(mode RunnerMode) {
+	r.Lock()
+	defer r.Unlock()
+
 	if r.worker != nil {
 		r.worker.Stop()
 	}
+
+	fmt.Println("Switching mode to", mode)
 
 	switch mode {
 	case RunnerModeLiveRebuild:
@@ -40,7 +48,9 @@ func (r *Runner) Start(mode RunnerMode) {
 		go func() {
 			<-r.worker.FinishedChannel
 			// return to live rebuild
-			r.Start(RunnerModeLiveRebuild)
+			if r.mode != RunnerModeLiveRebuild {
+				r.SetMode(RunnerModeLiveRebuild)
+			}
 		}()
 
 		break

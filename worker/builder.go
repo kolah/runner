@@ -73,7 +73,7 @@ func (b *Builder) createBuildErrorsLog(message string) {
 }
 
 func (b *Builder) removeBuildErrorsLog() {
-	if _, err := os.Stat(b.errorLogPath); os.IsExist(err) {
+	if _, err := os.Stat(b.errorLogPath); !os.IsNotExist(err) {
 		os.Remove(b.errorLogPath)
 	}
 }

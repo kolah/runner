@@ -18,7 +18,7 @@ func NewWorker(command string, arguments ...string) *Worker {
 	return &Worker{
 		command:         command,
 		arguments:       arguments,
-		stopChannel:     make(chan bool, 1),
+		stopChannel:     make(chan bool, 2),
 		FinishedChannel: make(chan bool, 1),
 	}
 }
@@ -59,7 +59,10 @@ func (w *Worker) Run() {
 
 		pid := cmd.Process.Pid
 		fmt.Println("Killing PID", pid)
-		cmd.Process.Kill()
+		if err := cmd.Process.Kill(); err != nil {
+			fmt.Println("Error killing process", pid, err)
+		}
+
 		w.stopChannel <- true
 	}()
 }

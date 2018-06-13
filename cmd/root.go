@@ -91,7 +91,7 @@ var rootCmd = &cobra.Command{
 				}
 
 				if !buildFailed {
-					runner.Start(currentMode)
+					runner.SetMode(currentMode)
 				} else if config.Config.WebWrapperEnabled {
 					// start web server to show the error
 				}
@@ -100,7 +100,7 @@ var rootCmd = &cobra.Command{
 			}
 		}()
 
-		// trigger build
+		// trigger first build
 		watch.EventChannel <- "/"
 
 		sigc := make(chan os.Signal, 1)
@@ -162,7 +162,7 @@ func serverHandler(c net.Conn) {
 					c.Close()
 					return
 				}
-				runner.Start(mode)
+				runner.SetMode(mode)
 				fmt.Fprintln(c, ServerOK, "Switched mode to", mode)
 				c.Close()
 				return
