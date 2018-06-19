@@ -19,7 +19,7 @@ type configuration struct {
 	IgnoredDirectories  []string `mapstructure:"ignored_directories" yaml:"ignored_directories"`
 	BuildDelay          int      `mapstructure:"build_delay" yaml:"build_delay"`
 	WebWrapperEnabled   bool     `mapstructure:"web_wrapper_enabled" yaml:"web_wrapper_enabled"`
-	SocketPath          string   `mapstructure:"socket_path" yaml:"socket_path"`
+	RunnerPort          int      `mapstructure:"runner_port" yaml:"runner_port"`
 }
 
 func (c configuration) BuildLogPath() string {
@@ -44,7 +44,6 @@ func (c configuration) HasFileValidExtension(fileName string) bool {
 
 	return false
 }
-
 
 func init() {
 	Config = configuration{}

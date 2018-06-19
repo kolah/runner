@@ -3,11 +3,11 @@ package cmd
 import (
 	"github.com/spf13/cobra"
 	"net"
-	"github.com/kolah/runner/config"
 	"fmt"
 	"bufio"
 	"os"
 	"github.com/kolah/runner/worker"
+	"github.com/kolah/runner/config"
 )
 
 var controlCmd = &cobra.Command{
@@ -20,7 +20,7 @@ var controlCmd = &cobra.Command{
 			os.Exit(1)
 		}
 
-		c, err := net.Dial("unix", config.Config.SocketPath)
+		c, err := net.Dial("tcp", fmt.Sprintf("localhost:%d", config.Config.RunnerPort))
 		if err != nil {
 			fmt.Fprintln(cmd.OutOrStderr(), "Dial error", err)
 			os.Exit(1)

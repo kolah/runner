@@ -47,7 +47,7 @@ var rootCmd = &cobra.Command{
 
 		os.Mkdir(config.Config.TmpPath, 0755)
 
-		server := server.NewSocketServer(config.Config.SocketPath, serverHandler)
+		server := server.NewSocketServer(config.Config.RunnerPort, serverHandler)
 		log.Println("Starting socket server")
 		server.Start()
 
@@ -194,7 +194,7 @@ func initConfig() {
 	viper.SetDefault("ignored_directories", []string{"assets", "tmp"})
 	viper.SetDefault("build_delay", 600)
 	viper.SetDefault("web_wrapper_enabled", false)
-	viper.SetDefault("socket_path", "./tmp/runner.sock") //
+	viper.SetDefault("runner_port", 55555)
 
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatal(err)

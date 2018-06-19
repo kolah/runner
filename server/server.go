@@ -3,27 +3,26 @@ package server
 import (
 	"net"
 	"log"
-	"syscall"
+	"fmt"
 )
 
 type SocketServerHandlerFunc = func(c net.Conn)
 
 type SocketServer struct {
-	handler     SocketServerHandlerFunc
-	socketPath  string
-	socket      net.Listener
+	handler SocketServerHandlerFunc
+	port    int
+	socket  net.Listener
 }
 
-func NewSocketServer(path string, h SocketServerHandlerFunc) *SocketServer {
+func NewSocketServer(port int, h SocketServerHandlerFunc) *SocketServer {
 	return &SocketServer{
-		handler:     h,
-		socketPath:  path,
+		handler:    h,
+		port: port,
 	}
 }
 
 func (s *SocketServer) Start() {
-	syscall.Unlink(s.socketPath)
-	socket, err := net.Listen("unix", s.socketPath)
+	socket, err := net.Listen("tcp", fmt.Sprintf(":%d", s.port))
 
 	if err != nil {
 		log.Fatal("Listen error: ", err)
