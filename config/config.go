@@ -10,16 +10,16 @@ import (
 var Config configuration
 
 type configuration struct {
-	Root                string   `yaml:"root"`
+	ProjectRoot         string   `yaml:"project_root"`
 	TmpPath             string   `mapstructure:"tmp_path" yaml:"tmp_path"`
-	BuildName           string   `mapstructure:"build_name" yaml:"build_name"`
+	BuildFilename       string   `mapstructure:"build_filename" yaml:"build_filename"`
 	BuildLog            string   `mapstructure:"build_log" yaml:"build_log"`
 	ValidExtensions     []string `mapstructure:"valid_extensions" yaml:"valid_extensions"`
-	NoRebuildExtensions []string `mapstructure:"no_rebuild_extensions" yaml:"no_rebuild_extensions"`
 	IgnoredDirectories  []string `mapstructure:"ignored_directories" yaml:"ignored_directories"`
 	BuildDelay          int      `mapstructure:"build_delay" yaml:"build_delay"`
 	WebWrapperEnabled   bool     `mapstructure:"web_wrapper_enabled" yaml:"web_wrapper_enabled"`
 	RunnerPort          int      `mapstructure:"runner_port" yaml:"runner_port"`
+	DebuggerPort        int      `mapstructure:"debugger_port" yaml:"debugger_port"`
 }
 
 func (c configuration) BuildLogPath() string {
@@ -27,7 +27,7 @@ func (c configuration) BuildLogPath() string {
 }
 
 func (c configuration) BuildPath() string {
-	p := filepath.Join(c.TmpPath, c.BuildName)
+	p := filepath.Join(c.TmpPath, c.BuildFilename)
 	if runtime.GOOS == "windows" && filepath.Ext(p) != ".exe" {
 		p += ".exe"
 	}

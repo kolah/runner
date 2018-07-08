@@ -50,8 +50,9 @@ func (b *Builder) Build() error {
 
 	err = cmd.Wait()
 	if err != nil {
-		b.createBuildErrorsLog(string(errBuf))
-		return errors.New("build failed")
+		errorMessage := string(errBuf)
+		b.createBuildErrorsLog(errorMessage)
+		return errors.New(errorMessage)
 	}
 	log.Println("Build finished")
 

@@ -17,12 +17,14 @@ type Runner struct {
 	worker *Worker
 	mode RunnerMode
 	executablePath string
+	debuggerPort int
 }
 
-func NewRunner(executablePath string) *Runner {
+func NewRunner(executablePath string, debuggerPort int) *Runner {
 	return &Runner{
 		mode: RunnerModeLiveRebuild,
 		executablePath: executablePath,
+		debuggerPort: debuggerPort,
 	}
 }
 
@@ -42,16 +44,8 @@ func (r *Runner) SetMode(mode RunnerMode) {
 		r.worker.Run()
 		break
 	case RunnerModeDebug:
-		r.worker = NewWorker("dlv", "--headless", "--listen=:2345", "--api-version=2", "exec", r.executablePath)
+		r.worker = NewWorker("dlv", "--headless", fmt.Sprintf("--listen=:%d", r.debuggerPort), "--api-version=2", "exec", r.executablePath)
 		r.worker.Run()
-
-		go func() {
-			<-r.worker.FinishedChannel
-			// return to live rebuild
-			if r.mode != RunnerModeLiveRebuild {
-				r.SetMode(RunnerModeLiveRebuild)
-			}
-		}()
 
 		break
 	}

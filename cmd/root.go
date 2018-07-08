@@ -51,11 +51,11 @@ var rootCmd = &cobra.Command{
 		log.Println("Starting socket server")
 		server.Start()
 
-		watch = watcher.NewWatcher(config.Config.Root, config.Config.TmpPath, config.Config.IgnoredDirectories, config.Config.ValidExtensions)
+		watch = watcher.NewWatcher(config.Config.ProjectRoot, config.Config.TmpPath, config.Config.IgnoredDirectories, config.Config.ValidExtensions)
 		watch.Start()
 
-		builder = worker.NewBuilder(config.Config.Root, config.Config.BuildPath(), config.Config.BuildLogPath())
-		runner = worker.NewRunner(config.Config.BuildPath())
+		builder = worker.NewBuilder(config.Config.ProjectRoot, config.Config.BuildPath(), config.Config.BuildLogPath())
+		runner = worker.NewRunner(config.Config.BuildPath(), config.Config.DebuggerPort)
 
 		loopIndex := 0
 		buildFailed := false
@@ -74,7 +74,7 @@ var rootCmd = &cobra.Command{
 				time.Sleep(time.Duration(config.Config.BuildDelay) * time.Millisecond)
 
 				fmt.Println("flushing events")
-				flushEvents(watch)
+				flushFSEvents(watch)
 
 				fmt.Printf("Started! (%d Goroutines)\n", runtime.NumGoroutine())
 
@@ -93,7 +93,7 @@ var rootCmd = &cobra.Command{
 				if !buildFailed {
 					runner.SetMode(currentMode)
 				} else if config.Config.WebWrapperEnabled {
-					// start web server to show the error
+					// start a web server to show the error
 				}
 
 				fmt.Printf(strings.Repeat("-", 20))
@@ -185,16 +185,16 @@ func initConfig() {
 	viper.SetConfigType("yaml")
 	viper.AddConfigPath(".")
 
-	viper.SetDefault("root", ".")
+	viper.SetDefault("project_root", ".")
 	viper.SetDefault("tmp_path", "./tmp")
-	viper.SetDefault("build_name", "runner-build")
+	viper.SetDefault("build_filename", "runner-build")
 	viper.SetDefault("build_log", "runner-build-errors.log")
-	viper.SetDefault("valid_extensions", []string{".go", ".tpl", ".tmpl", ".html"})
-	viper.SetDefault("no_rebuild_extensions", []string{".tpl", ".tmpl", ".html"})
-	viper.SetDefault("ignored_directories", []string{"assets", "tmp"})
+	viper.SetDefault("valid_extensions", []string{".go"})
+	viper.SetDefault("ignored_directories", []string{"tmp"})
 	viper.SetDefault("build_delay", 600)
 	viper.SetDefault("web_wrapper_enabled", false)
 	viper.SetDefault("runner_port", 55555)
+	viper.SetDefault("debugger_port", 2345)
 
 	if err := viper.ReadInConfig(); err != nil {
 		log.Fatal(err)
@@ -203,7 +203,7 @@ func initConfig() {
 	viper.Unmarshal(&config.Config)
 }
 
-func flushEvents(w *watcher.Watcher) {
+func flushFSEvents(w *watcher.Watcher) {
 	for {
 		select {
 		case eventName := <-w.EventChannel:
