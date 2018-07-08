@@ -28,6 +28,10 @@ func NewRunner(executablePath string, debuggerPort int) *Runner {
 	}
 }
 
+func (r *Runner) GetMode() RunnerMode {
+	return r.mode
+}
+
 func (r *Runner) SetMode(mode RunnerMode) {
 	r.Lock()
 	defer r.Unlock()

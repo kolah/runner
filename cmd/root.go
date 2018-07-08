@@ -78,6 +78,11 @@ var rootCmd = &cobra.Command{
 
 				fmt.Printf("Started! (%d Goroutines)\n", runtime.NumGoroutine())
 
+				if runner.GetMode() == worker.RunnerModeDebug {
+					fmt.Println("ignoring code changes while debugging")
+					continue
+				}
+
 				// extract filename from event
 				fileName := strings.Replace(strings.Split(eventName, ":")[0], `"`, "", -1)
 				if config.Config.HasFileValidExtension(fileName) || !alreadyBuilt {
