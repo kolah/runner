@@ -10,7 +10,7 @@ import (
 var Config configuration
 
 type configuration struct {
-	ProjectRoot         string   `yaml:"project_root"`
+	ProjectRoot         string   `mapstructure:"project_root" yaml:"project_root"`
 	TmpPath             string   `mapstructure:"tmp_path" yaml:"tmp_path"`
 	BuildFilename       string   `mapstructure:"build_filename" yaml:"build_filename"`
 	BuildLog            string   `mapstructure:"build_log" yaml:"build_log"`
