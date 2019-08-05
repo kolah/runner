@@ -77,10 +77,8 @@ func (w *Worker) Run() {
 		pid := cmd.Process.Pid
 		fmt.Println("Killing PID", pid)
 
-		pgid, err := syscall.Getpgid(cmd.Process.Pid)
-		if err == nil {
-			err := syscall.Kill(-pgid, syscall.SIGTERM) // note the minus sign
-			fmt.Println("Error killing process group", pgid, err)
+		if err := syscall.Kill(-pid, syscall.SIGTERM); err != nil {
+			fmt.Println("Error killing children", pid, err)
 		}
 
 		if err := cmd.Process.Kill(); err != nil {
