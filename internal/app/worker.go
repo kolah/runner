@@ -26,7 +26,7 @@ func NewWorker(command string) *Worker {
 }
 
 func (w *Worker) Run() {
-	log.Println("Building...")
+	log.Println("Running...")
 
 	parts, err := shellquote.Split(w.command)
 
