@@ -1,24 +1,23 @@
-package worker
+package app
 
 import (
-	"log"
-	"os/exec"
-	"io"
-	"os"
-	"io/ioutil"
 	"errors"
+	"github.com/kballard/go-shellquote"
+	"io"
+	"io/ioutil"
+	"log"
+	"os"
+	"os/exec"
 )
 
 type Builder struct {
-	rootPath     string
-	outputPath   string
+	buildCommand string
 	errorLogPath string
 }
 
-func NewBuilder(rootPath string, outputPath string, errorLogPath string) *Builder {
+func NewBuilder(buildCommand, errorLogPath string) *Builder {
 	return &Builder{
-		rootPath:   rootPath,
-		outputPath: outputPath,
+		buildCommand: buildCommand,
 		errorLogPath: errorLogPath,
 	}
 }
@@ -28,7 +27,16 @@ func (b *Builder) Build() error {
 
 	log.Println("Building...")
 
-	cmd := exec.Command("go", "build", "-gcflags", "all=-N -l", "-o", b.outputPath, b.rootPath)
+	parts, err := shellquote.Split(b.buildCommand)
+
+	if err != nil {
+		return err
+	}
+
+	head := parts[0]
+	parts = parts[1:]
+
+	cmd := exec.Command(head, parts...)
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
@@ -44,7 +52,7 @@ func (b *Builder) Build() error {
 	if err != nil {
 		log.Fatal(err)
 	}
-
+	//noinspection ALL
 	io.Copy(os.Stdout, stdout)
 	errBuf, _ := ioutil.ReadAll(stderr)
 
@@ -52,6 +60,7 @@ func (b *Builder) Build() error {
 	if err != nil {
 		errorMessage := string(errBuf)
 		b.createBuildErrorsLog(errorMessage)
+
 		return errors.New(errorMessage)
 	}
 	log.Println("Build finished")
@@ -75,7 +84,7 @@ func (b *Builder) createBuildErrorsLog(message string) {
 
 func (b *Builder) removeBuildErrorsLog() {
 	if _, err := os.Stat(b.errorLogPath); !os.IsNotExist(err) {
-		os.Remove(b.errorLogPath)
+		_ = os.Remove(b.errorLogPath)
 	}
 }
 

@@ -1,0 +1,17 @@
+ctl_port: 55555 # Listen on this port to enable changing state of running instance
+watch:
+    directories: # A list of directories to watch
+        - .
+    watch_patterns: # A list of file patterns to trigger rebuild. You can use wildcards or enter exact filenames
+        - "*.go"
+    ignored_directories: ["tmp", "vendor"] # A list of directories not to watch
+    verbose: false
+build:
+    command: go build -gcflags='all=-N -l' -o tmp/tmp-build . # Command triggered to build the application
+    error_log: tmp/build_error.log # Location of the build error log file.
+    delay: 650ms # Delay before build that is triggered by file system changes
+    tmp_dir: tmp # Location of tmp dir. It will be created recursively on start if not exists
+run:
+    command: tmp/tmp-build
+    debug_command: dlv --headless --listen=:2345 --api-version=2 exec tmp/tmp-build # Command triggered to start debug
+    build_before_debug: true # Flag executing build before debug

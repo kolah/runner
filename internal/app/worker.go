@@ -1,10 +1,13 @@
-package worker
+package app
 
 import (
+	"github.com/kballard/go-shellquote"
+	"log"
 	"os/exec"
 	"io"
 	"os"
 	"fmt"
+	"syscall"
 )
 
 type Worker struct {
@@ -14,17 +17,29 @@ type Worker struct {
 	FinishedChannel chan bool
 }
 
-func NewWorker(command string, arguments ...string) *Worker {
+func NewWorker(command string) *Worker {
 	return &Worker{
 		command:         command,
-		arguments:       arguments,
-		stopChannel:     make(chan bool, 1),
+		stopChannel:     make(chan bool),
 		FinishedChannel: make(chan bool, 1),
 	}
 }
 
 func (w *Worker) Run() {
-	cmd := exec.Command(w.command, w.arguments...)
+	log.Println("Building...")
+
+	parts, err := shellquote.Split(w.command)
+
+	if err != nil {
+		fmt.Println("Error", err)
+		return
+	}
+
+	head := parts[0]
+	parts = parts[1:]
+
+	cmd := exec.Command(head, parts...)
+	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
@@ -43,8 +58,9 @@ func (w *Worker) Run() {
 		fmt.Println("Error", err)
 		os.Exit(1)
 	}
-
+	//noinspection ALL
 	go io.Copy(os.Stderr, stderr)
+	//noinspection ALL
 	go io.Copy(os.Stdout, stdout)
 
 	go func() {
@@ -55,10 +71,17 @@ func (w *Worker) Run() {
 	}()
 
 	go func() {
+		fmt.Println("Waiting for stop signal")
 		<-w.stopChannel
 
 		pid := cmd.Process.Pid
 		fmt.Println("Killing PID", pid)
+
+		pgid, err := syscall.Getpgid(cmd.Process.Pid)
+		if err == nil {
+			_ = syscall.Kill(-pgid, 15) // note the minus sign
+		}
+
 		if err := cmd.Process.Kill(); err != nil {
 			fmt.Println("Error killing process", pid, err)
 		}
@@ -69,5 +92,4 @@ func (w *Worker) Run() {
 func (w *Worker) Stop() {
 	w.stopChannel <- true
 	<-w.FinishedChannel
-	w.FinishedChannel <- true
 }
