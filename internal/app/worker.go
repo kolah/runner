@@ -2,12 +2,12 @@ package app
 
 import (
 	"github.com/kballard/go-shellquote"
+	"github.com/shirou/gopsutil/process"
 	"log"
 	"os/exec"
 	"io"
 	"os"
 	"fmt"
-	"syscall"
 )
 
 type Worker struct {
@@ -39,7 +39,6 @@ func (w *Worker) Run() {
 	parts = parts[1:]
 
 	cmd := exec.Command(head, parts...)
-	cmd.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
@@ -77,8 +76,23 @@ func (w *Worker) Run() {
 		pid := cmd.Process.Pid
 		fmt.Println("Killing PID", pid)
 
-		if err := syscall.Kill(-pid, syscall.SIGTERM); err != nil {
-			fmt.Println("Error killing children", pid, err)
+		proc, err := process.NewProcess(int32(pid))
+
+		if err != nil {
+			fmt.Println("Error obtaining process")
+		} else {
+			children, err := proc.Children()
+			if err != nil {
+				fmt.Println("Error obtaining process children")
+			} else {
+				for _, child := range children {
+					fmt.Println("Trying to kill child process", child.Pid)
+					err := child.Kill()
+					if err != nil {
+						fmt.Println("Failed to kill child process", child.Pid)
+					}
+				}
+			}
 		}
 
 		if err := cmd.Process.Kill(); err != nil {
