@@ -3,7 +3,6 @@ package simplerpc
 import (
 	"bufio"
 	"fmt"
-	"log"
 	"net"
 	"strings"
 )
@@ -23,11 +22,11 @@ func NewServer(port int) *Server {
 	}
 }
 
-func (s *Server) Start() {
+func (s *Server) Start() error {
 	socket, err := net.Listen("tcp", fmt.Sprintf(":%d", s.port))
 
 	if err != nil {
-		log.Fatal("Listen error: ", err)
+		return err
 	}
 
 	s.socket = socket
@@ -36,12 +35,14 @@ func (s *Server) Start() {
 		for {
 			fd, err := socket.Accept()
 			if err != nil {
-				log.Println("Accept error: ", err)
+				continue
 			}
 
 			go s.handleConnection(fd)
 		}
 	}()
+
+	return nil
 }
 
 func (s *Server) AddHandler(command string, handler ServerHandlerFunc) {
@@ -51,35 +52,33 @@ func (s *Server) AddHandler(command string, handler ServerHandlerFunc) {
 func (s *Server) handleConnection(c net.Conn) {
 	b := bufio.NewReader(c)
 
-	for {
-		line, err := b.ReadBytes('\n')
-		if err != nil { // EOF, or worse
-			break
-		}
-		// split command into parts, remove last character (new line)
-		parts := strings.Split(string(line[0:len(line)-1]), " ")
+	line, err := b.ReadBytes('\n')
+	if err != nil { // EOF, or worse
+		return
+	}
+	// split command into parts, remove last character (new line)
+	parts := strings.Split(string(line[0:len(line)-1]), " ")
 
-		if len(parts) == 0 {
-			//noinspection ALL
-			fmt.Fprintln(c, "ERR", "Command required", parts[0])
-			//noinspection ALL
-			c.Close()
-		}
-		command := parts[0]
-
-		if !s.hasHandler(command) {
-			//noinspection ALL
-			fmt.Fprintln(c, "ERR", "Unknown command", parts[0])
-			//noinspection ALL
-			c.Close()
-			continue
-		}
-
-		handler := s.handler(command)
-		handler(c, parts[1:])
+	if len(parts) == 0 {
+		//noinspection ALL
+		fmt.Fprintln(c, "ERR", "Command required", parts[0])
 		//noinspection ALL
 		c.Close()
 	}
+	command := parts[0]
+
+	if !s.hasHandler(command) {
+		//noinspection ALL
+		fmt.Fprintln(c, "ERR", "Unknown command", parts[0])
+		//noinspection ALL
+		c.Close()
+		return
+	}
+
+	handler := s.handler(command)
+	handler(c, parts[1:])
+	//noinspection ALL
+	c.Close()
 }
 
 func (s *Server) hasHandler(command string) bool {
@@ -97,7 +96,5 @@ func (s *Server) handler(command string) ServerHandlerFunc {
 }
 
 func (s *Server) Stop() error {
-	log.Println("Stopping socket server")
-
 	return s.socket.Close()
 }

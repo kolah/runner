@@ -36,7 +36,7 @@ func SetModeHandler(runner *app.Runner) simplerpc.ServerHandlerFunc {
 		}
 
 		mode := app.RunnerMode(args[0])
-		if mode == app.RunnerModeDebug || mode == app.RunnerModeLiveRebuild {
+		if mode == app.ModeDebug || mode == app.ModeRebuild {
 			if err := runner.Build(); err != nil {
 				//noinspection ALL
 				fmt.Fprintln(c, ServerErr, "Build error")

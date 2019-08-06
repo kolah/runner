@@ -3,36 +3,37 @@ package app
 import (
 	"github.com/kballard/go-shellquote"
 	"github.com/shirou/gopsutil/process"
-	"log"
-	"os/exec"
 	"io"
-	"os"
-	"fmt"
+	"os/exec"
 )
 
 type Worker struct {
-	command         string
-	arguments       []string
-	stopChannel     chan bool
-	FinishedChannel chan bool
+	command   string
+	arguments []string
+	quit      chan bool
+	finished  chan bool
+	logger    Logger
+	appLogger *RunnerOutLog
 }
 
-func NewWorker(command string) *Worker {
+func NewWorker(command string, logger Logger, appLogger *RunnerOutLog) *Worker {
 	return &Worker{
-		command:         command,
-		stopChannel:     make(chan bool),
-		FinishedChannel: make(chan bool, 1),
+		command:   command,
+		quit:      make(chan bool),
+		finished:  make(chan bool, 1),
+		logger:    logger,
+		appLogger: appLogger,
 	}
 }
 
-func (w *Worker) Run() {
-	log.Println("Running...")
+func (w *Worker) Run() error {
+	w.logger.Infof("Running %s...\n", w.command)
 
 	parts, err := shellquote.Split(w.command)
 
 	if err != nil {
-		fmt.Println("Error", err)
-		return
+		w.logger.Infof("Error parsing command \"%s\": %s\n", w.command, err.Error())
+		return nil
 	}
 
 	head := parts[0]
@@ -42,67 +43,72 @@ func (w *Worker) Run() {
 
 	stderr, err := cmd.StderrPipe()
 	if err != nil {
-		fmt.Println("Error", err)
-		os.Exit(1)
+		return err
 	}
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		fmt.Println("Error", err)
-		os.Exit(1)
+		return err
 	}
 
 	err = cmd.Start()
 	if err != nil {
-		fmt.Println("Error", err)
-		os.Exit(1)
+		w.logger.Infof("Cannot execute command \"%s\": %s", w.command, err.Error())
+		return nil
 	}
 	//noinspection ALL
-	go io.Copy(os.Stderr, stderr)
+	go io.Copy(w.appLogger.errWriter, stderr)
 	//noinspection ALL
-	go io.Copy(os.Stdout, stdout)
+	go io.Copy(w.appLogger.outWriter, stdout)
 
 	go func() {
 		if err := cmd.Wait(); err != nil {
-			fmt.Println(err)
+			w.logger.Debugf("Error while waiting for process to finish: %s", err.Error())
 		}
-		w.FinishedChannel <- true
+		w.finished <- true
 	}()
 
 	go func() {
-		fmt.Println("Waiting for stop signal")
-		<-w.stopChannel
+		<-w.quit
 
 		pid := cmd.Process.Pid
-		fmt.Println("Killing PID", pid)
-
-		proc, err := process.NewProcess(int32(pid))
-
-		if err != nil {
-			fmt.Println("Error obtaining process")
-		} else {
-			children, err := proc.Children()
-			if err != nil {
-				fmt.Println("Error obtaining process children")
-			} else {
-				for _, child := range children {
-					fmt.Println("Trying to kill child process", child.Pid)
-					err := child.Kill()
-					if err != nil {
-						fmt.Println("Failed to kill child process", child.Pid)
-					}
-				}
-			}
+		if err := w.killChildProcesses(int32(pid)); err != nil {
+			w.logger.Debugf("Error killing children processes %d: %s\n", pid, err.Error())
 		}
 
 		if err := cmd.Process.Kill(); err != nil {
-			fmt.Println("Error killing process", pid, err)
+			w.logger.Debugf("Error killing process %d: %s", pid, err.Error())
 		}
-		w.FinishedChannel <- true
+		w.finished <- true
 	}()
+
+	return nil
 }
 
 func (w *Worker) Stop() {
-	w.stopChannel <- true
-	<-w.FinishedChannel
+	w.quit <- true
+	<-w.finished
+}
+
+func (w *Worker) killChildProcesses(pid int32) error {
+	proc, err := process.NewProcess(pid)
+
+	if err != nil {
+		return err
+	}
+
+	children, err := proc.Children()
+	if err != nil {
+		return err
+	}
+
+	if len(children) == 0 {
+		return nil
+	}
+
+	for _, child := range children {
+		_ = child.Kill()
+	}
+
+	return nil
 }

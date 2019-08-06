@@ -1,17 +1,21 @@
 package config
 
 import (
+	"github.com/kolah/runner/internal/app"
 	"github.com/spf13/cobra"
 	"github.com/spf13/viper"
 	"strings"
 	"time"
 )
 
+type Logging struct {
+	Level string
+}
+
 type Watch struct {
 	Directories        []string
 	WatchPatterns      []string `mapstructure:"watch_patterns" yaml:"watch_patterns"`
 	IgnoredDirectories []string `mapstructure:"ignored_directories" yaml:"ignored_directories"`
-	Verbose            bool
 }
 
 type Build struct {
@@ -31,6 +35,7 @@ type Config struct {
 	Watch   Watch
 	Run     Run
 	Build   Build
+	Logging Logging
 	CtlPort int `mapstructure:"ctl_port" yaml:"ctl_port"`
 }
 
@@ -49,7 +54,6 @@ func LoadConfig(cmd *cobra.Command) (*Config, error) {
 	viper.SetDefault("watch.directories", []string{"."})
 	viper.SetDefault("watch.watch_patterns", []string{"*.go"})
 	viper.SetDefault("watch.ignore_directories", []string{"tmp", "vendor"})
-	viper.SetDefault("watch.verbose", true)
 
 	viper.SetDefault("build.command", "go build -gcflags='all=-N=-l' -o tmp/tmp-build .")
 	viper.SetDefault("build.error_log", "tmp/build_error.log")
@@ -59,6 +63,8 @@ func LoadConfig(cmd *cobra.Command) (*Config, error) {
 	viper.SetDefault("run.command", "tmp/tmp-build")
 	viper.SetDefault("run.debug_command", "dlv --headless --listen=:2345 --api-version=2 exec tmp/tmp-build")
 	viper.SetDefault("run.build_before_debug", true)
+
+	viper.SetDefault("logging.level", app.InfoLevel)
 
 	if configFile, _ := cmd.Flags().GetString("config"); configFile != "" {
 		viper.SetConfigFile(configFile)
@@ -80,4 +86,14 @@ func LoadConfig(cmd *cobra.Command) (*Config, error) {
 	}
 
 	return &config, nil
+}
+
+func ConfigureLogging(config Logging) (app.Logger, error) {
+	level, err := app.ParseLevel(config.Level)
+
+	if err != nil {
+		return nil, err
+	}
+
+	return app.NewStdoutLog(level), nil
 }

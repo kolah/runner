@@ -6,9 +6,8 @@ import (
 	"github.com/kolah/runner/internal/app/config"
 	"github.com/kolah/runner/internal/app/rpc"
 	"github.com/kolah/runner/internal/pkg/simplerpc"
-	"log"
-
 	"github.com/spf13/cobra"
+	"log"
 	"os"
 )
 
@@ -43,17 +42,17 @@ var controlCmd = &cobra.Command{
 		case "debug":
 			//noinspection ALL
 			fmt.Fprintln(cmd.OutOrStdout(), "Switching runner to debug mode")
-			msg = fmt.Sprintf("%s %s", rpc.ClientSetMode, app.ModeDebug)
+			msg = fmt.Sprintf("%s %s", rpc.SetMode, app.ModeDebug)
 			break
 		case "rebuild":
 			//noinspection ALL
 			fmt.Fprintln(cmd.OutOrStdout(), "Switching runner to live rebuild mode")
-			msg = fmt.Sprintf("%s %s", rpc.ClientSetMode, app.ModeRebuild)
+			msg = fmt.Sprintf("%s %s", rpc.SetMode, app.ModeRebuild)
 			break
 		case "stop":
 			//noinspection ALL
 			fmt.Fprintln(cmd.OutOrStdout(), "Stopping runner")
-			msg = fmt.Sprintf("%s", rpc.ClientStop)
+			msg = fmt.Sprintf("%s", rpc.Stop)
 			break
 		default:
 			//noinspection ALL
@@ -73,7 +72,4 @@ var controlCmd = &cobra.Command{
 		//noinspection ALL
 		fmt.Fprintln(cmd.OutOrStdout(), "Response:", line)
 	},
-
 }
-
-

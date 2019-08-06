@@ -1,17 +1,16 @@
 package app
 
 import (
-	"fmt"
+	"errors"
 	"github.com/fsnotify/fsnotify"
 	"github.com/kolah/runner/internal/pkg/set"
-	"log"
 	"os"
 	"path/filepath"
 	"strings"
 	"sync"
 )
 
-type Listener func(event fsnotify.Event)
+type ListenerFunc func(event fsnotify.Event)
 
 type Watcher struct {
 	sync.Mutex
@@ -22,35 +21,25 @@ type Watcher struct {
 	watcher       *fsnotify.Watcher
 	quit          chan bool
 	verbose       bool
-	listeners     []Listener
+	listeners     []ListenerFunc
+	logger        Logger
 }
 
-func NewWatcher(watchDirs []string, ignoredDirs []string, watchPatterns []string) *Watcher {
+func NewWatcher(watchDirs []string, ignoredDirs []string, watchPatterns []string, logger Logger) *Watcher {
 	return &Watcher{
 		watchDirs:     set.NewSet(watchDirs),
 		ignoredDirs:   set.NewSet(ignoredDirs),
 		watchPatterns: set.NewSet(watchPatterns),
 		verbose:       false,
-		listeners:     make([]Listener, 0),
+		listeners:     make([]ListenerFunc, 0),
+		logger:        logger,
 	}
 }
 
-func (w *Watcher) Verbose() *Watcher {
-	w.verbose = true
-
-	return w
-}
-
-func (w *Watcher) Silent() *Watcher {
-	w.verbose = false
-
-	return w
-}
-
 func (w *Watcher) Start() (err error) {
-	w.logVerbose("Watcher: starting")
+	w.logger.Debug("Watcher: starting\n")
 	if w.watcher != nil {
-		return fmt.Errorf("watcher already started")
+		return errors.New("watcher already started")
 	}
 
 	w.watcher, err = fsnotify.NewWatcher()
@@ -75,7 +64,7 @@ func (w *Watcher) Start() (err error) {
 
 // AddListener adds a listener function to run on event,
 // the listener function will receive the event object as argument.
-func (w *Watcher) AddListener(l Listener) {
+func (w *Watcher) AddListener(l ListenerFunc) {
 	w.Lock()
 	defer w.Unlock()
 
@@ -83,7 +72,7 @@ func (w *Watcher) AddListener(l Listener) {
 }
 
 func (w *Watcher) Stop() error {
-	w.logVerbose("Watcher: stopping")
+	w.logger.Debug("Watcher: stopping\n")
 	if w.quit != nil {
 		w.quit <- true
 		close(w.quit)
@@ -107,13 +96,12 @@ func (w *Watcher) AddRecursive(dir string) error {
 			}
 
 			if w.isIgnoredDir(path) {
-				if w.verbose {
-					w.logVerbose(fmt.Sprintf("Watcher: \"%s\" ignored", path))
-				}
+				w.logger.Debugf("Watcher: ignoring \"%s\"\n", path)
+
 				return filepath.SkipDir
 			}
 
-			w.logVerbose(fmt.Sprintf("Watcher: \"%s\" watching", path))
+			w.logger.Debugf("Watcher: watching \"%s\"\n", path)
 			if err := w.watcher.Add(path); err != nil {
 				return err
 			}
@@ -136,17 +124,18 @@ func (w *Watcher) handleEvent(event fsnotify.Event) {
 	w.Lock()
 	defer w.Unlock()
 
-	w.logVerbose(fmt.Sprintf("Watcher: handling event for %s", event))
+	w.logger.Debugf("Watcher: handling event for %s\n", event)
 	// when new directory is created, add to watch
 	if event.Op&fsnotify.Create == fsnotify.Create {
 		info, err := os.Stat(event.Name)
 		if err == nil && info.IsDir() {
+			// noinspection ALL
 			go w.AddRecursive(event.Name)
 		}
 	}
 
 	if w.fileMatches(&event.Name) {
-		w.logVerbose(fmt.Sprintf("Watcher: file matching pattern \"%s\"", event.Name))
+		w.logger.Debugf("Watcher: file matching pattern \"%s\"\n", event.Name)
 		w.notify(event)
 	}
 }
@@ -196,10 +185,4 @@ func (w *Watcher) fileMatches(f *string) bool {
 	}
 
 	return false
-}
-
-func (w *Watcher) logVerbose(msg string) {
-	if w.verbose {
-		log.Println(msg)
-	}
 }

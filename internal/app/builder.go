@@ -1,7 +1,6 @@
 package app
 
 import (
-	"errors"
 	"github.com/kballard/go-shellquote"
 	"io"
 	"io/ioutil"
@@ -10,22 +9,36 @@ import (
 	"os/exec"
 )
 
+type BuildErr struct {
+	output string
+}
+
+func newBuildErr(o string) error {
+	return BuildErr{output: o}
+}
+
+func (e BuildErr) Error() string {
+	return e.output
+}
+
 type Builder struct {
 	buildCommand string
 	errorLogPath string
+	logger       Logger
 }
 
-func NewBuilder(buildCommand, errorLogPath string) *Builder {
+func NewBuilder(buildCommand, errorLogPath string, logger Logger) *Builder {
 	return &Builder{
 		buildCommand: buildCommand,
 		errorLogPath: errorLogPath,
+		logger:       logger,
 	}
 }
 
 func (b *Builder) Build() error {
 	b.removeBuildErrorsLog()
 
-	log.Println("Building...")
+	b.logger.Info("Building...\n")
 
 	parts, err := shellquote.Split(b.buildCommand)
 
@@ -45,12 +58,14 @@ func (b *Builder) Build() error {
 
 	stdout, err := cmd.StdoutPipe()
 	if err != nil {
-		log.Fatal(err)
+		return err
 	}
 
 	err = cmd.Start()
 	if err != nil {
-		log.Fatal(err)
+		b.logger.Infof("Unable to execute build %s\n", err.Error())
+
+		return err
 	}
 	//noinspection ALL
 	io.Copy(os.Stdout, stdout)
@@ -60,10 +75,12 @@ func (b *Builder) Build() error {
 	if err != nil {
 		errorMessage := string(errBuf)
 		b.createBuildErrorsLog(errorMessage)
+		b.logger.Infof("Build failed %s\n", err.Error())
 
-		return errors.New(errorMessage)
+		return newBuildErr(errorMessage)
 	}
-	log.Println("Build finished")
+
+	b.logger.Info("Build finished\n")
 
 	return nil
 }
@@ -87,4 +104,3 @@ func (b *Builder) removeBuildErrorsLog() {
 		_ = os.Remove(b.errorLogPath)
 	}
 }
-

@@ -33,31 +33,44 @@ func run(cmd *cobra.Command, args []string) {
 
 	_ = os.MkdirAll(configuration.Build.TmpDir, 0755)
 
-	builder := app.NewBuilder(configuration.Build.Command, configuration.Build.ErrorLog)
-	watch := app.NewWatcher(configuration.Watch.Directories, configuration.Watch.IgnoredDirectories, configuration.Watch.WatchPatterns)
+	logger, err := config.ConfigureLogging(configuration.Logging)
+	if err != nil {
+		log.Fatal("Failed to configure logger: ", err.Error())
+	}
+
+	// colored output for running application
+	appLogger := app.NewAppLog(logger)
+
+	builder := app.NewBuilder(configuration.Build.Command, configuration.Build.ErrorLog, logger)
+	watch := app.NewWatcher(configuration.Watch.Directories, configuration.Watch.IgnoredDirectories, configuration.Watch.WatchPatterns, logger)
 
 	runnerOptions := app.NewRunnerOptions(configuration.Build.Delay, configuration.Run.Command, configuration.Run.DebugCommand, configuration.Run.BuildBeforeDebug)
-	runner := app.NewRunner(watch, builder, runnerOptions)
+	runner := app.NewRunner(watch, builder, runnerOptions, logger, appLogger)
 
 	server := simplerpc.NewServer(configuration.CtlPort)
-	server.AddHandler(string(rpc.ClientStop), rpc.StopHandler())
-	server.AddHandler(string(rpc.ClientSetMode), rpc.SetModeHandler(runner))
+	server.AddHandler(rpc.Stop, rpc.StopHandler())
+	server.AddHandler(rpc.SetMode, rpc.SetModeHandler(runner))
 
-	log.Printf("Starting TCP server for commands on port %d", configuration.CtlPort)
-	server.Start()
+	logger.Infof("Starting TCP server for commands on port %d\n", configuration.CtlPort)
+	if err := server.Start(); err != nil {
+		logger.Info("Failed to start TCP server\n")
+		os.Exit(1)
+	}
 
 	if err := runner.Start(); err != nil {
-		log.Fatalf("Failed to start runner: %s", err.Error())
+		logger.Infof("Fatal error while starting runner %s\n", err.Error())
+		os.Exit(1)
 	}
 
 	sigc := make(chan os.Signal, 1)
 	signal.Notify(sigc, os.Interrupt, syscall.SIGTERM)
 
 	sig := <-sigc
-	log.Printf("Caught signal %s: shutting down.", sig)
+
+	logger.Debugf("Caught signal %s: shutting down\n", sig)
 
 	if err := runner.Stop(); err != nil {
-		log.Printf("Failed to stop runner: %s" + err.Error())
+		logger.Debugf("Failed to stop runner: %s\n", err.Error())
 	}
 	//noinspection ALL
 	server.Stop()

@@ -1,11 +1,8 @@
 package app
 
 import (
-	"fmt"
 	"github.com/fsnotify/fsnotify"
-	"log"
 	"runtime"
-	"strings"
 	"sync"
 	"time"
 )
@@ -28,6 +25,8 @@ type Runner struct {
 	events       chan interface{}
 	eventsBuffer []fsnotify.Event
 	quit         chan bool
+	logger       Logger
+	appLogger    *RunnerOutLog
 }
 
 type RunnerOpts struct {
@@ -41,7 +40,7 @@ func NewRunnerOptions(buildDelay time.Duration, runCommand string, debugCommand 
 	return RunnerOpts{buildDelay: buildDelay, runCommand: runCommand, debugCommand: debugCommand, buildBeforeDebug: buildBeforeDebug}
 }
 
-func NewRunner(watcher *Watcher, builder *Builder, options RunnerOpts) *Runner {
+func NewRunner(watcher *Watcher, builder *Builder, options RunnerOpts, logger Logger, appLogger *RunnerOutLog) *Runner {
 	return &Runner{
 		builder:      builder,
 		mode:         ModeRebuild,
@@ -49,6 +48,8 @@ func NewRunner(watcher *Watcher, builder *Builder, options RunnerOpts) *Runner {
 		options:      options,
 		eventsBuffer: make([]fsnotify.Event, 0),
 		quit:         make(chan bool, 1),
+		logger:       logger,
+		appLogger:    appLogger,
 	}
 }
 
@@ -57,18 +58,29 @@ func (r *Runner) Start() error {
 		return err
 	}
 
+	// don't stop on build error
+	buildErr := false
 	if err := r.Build(); err != nil {
-		return err
+		_, buildErr = err.(BuildErr)
+		if !buildErr {
+			return err
+		}
 	}
 
-	r.worker = NewWorker(r.options.runCommand)
-	r.worker.Run()
+	// start worker only on successful initial build
+	if !buildErr {
+		r.worker = NewWorker(r.options.runCommand, r.logger, r.appLogger)
+		if err := r.worker.Run(); err != nil {
+			return err
+		}
+	}
 
 	r.watcher.AddListener(func(event fsnotify.Event) {
 		r.Lock()
 		defer r.Unlock()
 
 		if r.options.buildDelay == 0 {
+			r.logger.Debug("Watched files changed, triggering event\n")
 			r.events <- struct{}{}
 			return
 		}
@@ -78,6 +90,7 @@ func (r *Runner) Start() error {
 			time.AfterFunc(r.options.buildDelay, func() {
 				r.Lock()
 				defer r.Unlock()
+				r.logger.Debug("Watched files changed, triggering event after delay\n")
 
 				r.events <- struct{}{}
 
@@ -119,33 +132,36 @@ func (r *Runner) SetMode(mode RunnerMode) {
 		r.worker.Stop()
 	}
 
-	fmt.Println("Switching mode to", mode)
+	r.logger.Infof("Switching mode to %s\n", mode)
 	command := r.options.runCommand
 	if mode == ModeDebug {
 		command = r.options.debugCommand
 		if r.options.buildBeforeDebug {
 			err := r.Build()
 			if err != nil {
-				log.Println("Build error:", err)
+				r.logger.Infof("Build error: %s\n", err)
+				return
 			}
 		}
 	}
 
-	r.worker = NewWorker(command)
-	r.worker.Run()
+	r.worker = NewWorker(command, r.logger, r.appLogger)
+	if err := r.worker.Run(); err != nil {
+		r.logger.Infof("Failed to run \"%s\", %s", command, err.Error())
+	}
 }
 
 func (r *Runner) mainLoop() {
 	for {
 		r.loopIndex++
 
-		fmt.Printf("Waiting (loop %d)...\n", r.loopIndex)
+		r.logger.Infof("Waiting (loop %d)...\n", r.loopIndex)
 		<-r.events
 
-		fmt.Printf("Rebuild triggered! (%d Go routines)\n", runtime.NumGoroutine())
+		r.logger.Debugf("Rebuild triggered! (%d Go routines)\n", runtime.NumGoroutine())
 
 		if r.Mode() == ModeDebug {
-			fmt.Println("ignoring code changes while debugging")
+			r.logger.Debug("ignoring code changes while debugging\n")
 			continue
 		}
 
@@ -154,7 +170,6 @@ func (r *Runner) mainLoop() {
 			r.SetMode(r.Mode())
 		}
 
-		fmt.Printf(strings.Repeat("-", 20) + "\n")
 		select {
 		case <-r.quit:
 			return

@@ -63,5 +63,6 @@ run:
     command: tmp/tmp-build
     debug_command: dlv --headless --listen=:2345 --api-version=2 exec tmp/tmp-build # Command triggered to start debug
     build_before_debug: true # Flag executing build before debug
-
+logging:
+    level: info # verbosity of application from highest to lowest, available: "info", "debug"
 ```
