@@ -43,12 +43,12 @@ var controlCmd = &cobra.Command{
 		case "debug":
 			//noinspection ALL
 			fmt.Fprintln(cmd.OutOrStdout(), "Switching runner to debug mode")
-			msg = fmt.Sprintf("%s %s", rpc.ClientSetMode, app.RunnerModeDebug)
+			msg = fmt.Sprintf("%s %s", rpc.ClientSetMode, app.ModeDebug)
 			break
 		case "rebuild":
 			//noinspection ALL
 			fmt.Fprintln(cmd.OutOrStdout(), "Switching runner to live rebuild mode")
-			msg = fmt.Sprintf("%s %s", rpc.ClientSetMode, app.RunnerModeLiveRebuild)
+			msg = fmt.Sprintf("%s %s", rpc.ClientSetMode, app.ModeRebuild)
 			break
 		case "stop":
 			//noinspection ALL

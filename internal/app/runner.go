@@ -13,8 +13,8 @@ import (
 type RunnerMode string
 
 const (
-	RunnerModeLiveRebuild RunnerMode = "LIVEREBUILD"
-	RunnerModeDebug       RunnerMode = "DEBUG"
+	ModeRebuild RunnerMode = "REBUILD"
+	ModeDebug   RunnerMode = "DEBUG"
 )
 
 type Runner struct {
@@ -44,7 +44,7 @@ func NewRunnerOptions(buildDelay time.Duration, runCommand string, debugCommand 
 func NewRunner(watcher *Watcher, builder *Builder, options RunnerOpts) *Runner {
 	return &Runner{
 		builder:      builder,
-		mode:         RunnerModeLiveRebuild,
+		mode:         ModeRebuild,
 		watcher:      watcher,
 		options:      options,
 		eventsBuffer: make([]fsnotify.Event, 0),
@@ -78,7 +78,7 @@ func (r *Runner) Start() error {
 			time.AfterFunc(r.options.buildDelay, func() {
 				r.Lock()
 				defer r.Unlock()
-				fmt.Println("Len: ", len(r.eventsBuffer))
+
 				r.events <- struct{}{}
 
 				// reset events buffer
@@ -121,12 +121,12 @@ func (r *Runner) SetMode(mode RunnerMode) {
 
 	fmt.Println("Switching mode to", mode)
 	command := r.options.runCommand
-	if mode == RunnerModeDebug {
+	if mode == ModeDebug {
 		command = r.options.debugCommand
 		if r.options.buildBeforeDebug {
 			err := r.Build()
 			if err != nil {
-				log.Print(err)
+				log.Println("Build error:", err)
 			}
 		}
 	}
@@ -142,9 +142,9 @@ func (r *Runner) mainLoop() {
 		fmt.Printf("Waiting (loop %d)...\n", r.loopIndex)
 		<-r.events
 
-		fmt.Printf("Started! (%d Goroutines)\n", runtime.NumGoroutine())
+		fmt.Printf("Rebuild triggered! (%d Go routines)\n", runtime.NumGoroutine())
 
-		if r.Mode() == RunnerModeDebug {
+		if r.Mode() == ModeDebug {
 			fmt.Println("ignoring code changes while debugging")
 			continue
 		}
@@ -160,17 +160,6 @@ func (r *Runner) mainLoop() {
 			return
 		default:
 			continue
-		}
-	}
-}
-
-func (r *Runner) flushFSEvents() {
-	for {
-		select {
-		case eventName := <-r.events:
-			fmt.Printf("flushing event %s\n", eventName)
-		default:
-			return
 		}
 	}
 }
