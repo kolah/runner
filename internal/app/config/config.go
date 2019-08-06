@@ -64,7 +64,7 @@ func LoadConfig(cmd *cobra.Command) (*Config, error) {
 	viper.SetDefault("run.debug_command", "dlv --headless --listen=:2345 --api-version=2 exec tmp/tmp-build")
 	viper.SetDefault("run.build_before_debug", true)
 
-	viper.SetDefault("logging.level", app.InfoLevel)
+	viper.SetDefault("logging.level", "info")
 
 	if configFile, _ := cmd.Flags().GetString("config"); configFile != "" {
 		viper.SetConfigFile(configFile)
